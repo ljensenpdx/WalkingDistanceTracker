@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Estacada Bus Route & Walking Distance Calculator</title>
+    <title>Estacada Bus Route & Walking Distance Dashboard</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -12,22 +12,34 @@
             margin: 0;
             padding: 20px;
         }
-        .container {
-            max-width: 800px;
+        .app-container {
+            max-width: 1400px;
             margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        @media (max-width: 900px) {
+            .app-container {
+                grid-template-columns: 1fr;
+            }
+        }
+        .panel {
             background: #fff;
-            padding: 30px;
+            padding: 25px;
             border-radius: 8px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            display: flex;
+            flex-direction: column;
         }
-        hh1, h2 {
+        h1, h2, h3 {
             color: #004080;
-            text-align: center;
+            margin-top: 0;
         }
         .search-box {
             display: flex;
             gap: 10px;
-            margin-bottom: 25px;
+            margin-bottom: 20px;
         }
         input[type="text"] {
             flex: 1;
@@ -37,7 +49,7 @@
             border-radius: 4px;
         }
         button {
-            padding: 12px 24px;
+            padding: 12px 20px;
             font-size: 16px;
             background-color: #004080;
             color: white;
@@ -50,9 +62,9 @@
         }
         .results-section {
             display: none;
-            margin-top: 20px;
+            margin-top: 15px;
             border-top: 2px solid #eee;
-            padding-top: 20px;
+            padding-top: 15px;
         }
         .status-badge {
             display: inline-block;
@@ -79,50 +91,77 @@
         .card {
             background: #f8f9fa;
             border-left: 4px solid #004080;
-            padding: 15px;
-            margin-bottom: 15px;
+            padding: 12px;
+            margin-bottom: 10px;
             border-radius: 0 4px 4px 0;
         }
         .error-text { color: #dc3545; font-weight: bold; }
-        .loading { text-align: center; font-style: italic; color: #666; display: none; }
+        .loading { font-style: italic; color: #666; margin-bottom: 10px; display: none; }
+        .map-wrapper {
+            flex: 1;
+            min-height: 600px;
+            width: 100%;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid #ddd;
+        }
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: 0;
+        }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <h1>Estacada Bus Calculator</h1>
-    
-    <div class="search-box">
-        <input type="text" id="addressInput" placeholder="Enter starting address (e.g., 31171 SE Judd Rd)" />
-        <button onclick="calculateAddress()">Calculate</button>
+<div class="app-container">
+    <!-- LEFT PANEL: Calculator & Search -->
+    <div class="panel">
+        <h1>Estacada Bus Calculator</h1>
+        
+        <div class="search-box">
+            <input type="text" id="addressInput" placeholder="Enter address (e.g., 31171 SE Judd Rd)" />
+            <button onclick="calculateAddress()">Calculate</button>
+        </div>
+
+        <div id="loading" class="loading">Calculating distances & checking routes...</div>
+
+        <div id="results" class="results-section">
+            <div id="metaInfo" style="margin-bottom: 15px;"></div>
+            
+            <h3>School Distances & Routes</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>School</th>
+                        <th>Walking Distance</th>
+                        <th>Assignment</th>
+                    </tr>
+                </thead>
+                <tbody id="schoolTableBody"></tbody>
+            </table>
+
+            <div id="busStopContainer">
+                <h3>Closest Bus Stop Assignments</h3>
+                <div id="busStopContent"></div>
+            </div>
+
+            <button onclick="downloadPinKml()" style="background-color: #28a745; margin-top: 15px; width: 100%; cursor: pointer;">
+                📍 Download Pin KML for Google My Maps
+            </button>
+        </div>
     </div>
 
-    <div id="loading" class="loading">Calculating distances, querying OSRM, and checking routes...</div>
-
-    <div id="results" class="results-section">
-        <div id="metaInfo" style="margin-bottom: 15px;"></div>
-        
-        <h3>School Distances & Routes</h3>
-        <table>
-            <thead>
-                <tr>
-                    <th>School</th>
-                    <th>Walking Distance</th>
-                    <th>Assignment</th>
-                </tr>
-            </thead>
-            <tbody id="schoolTableBody"></tbody>
-        </table>
-
-        <div id="busStopContainer">
-            <h3>Closest Bus Stop Assignments</h3>
-            <div id="busStopContent"></div>
+    <!-- RIGHT PANEL: Live Google My Map -->
+    <div class="panel">
+        <h2>Live Route Map</h2>
+        <div class="map-wrapper">
+            <iframe src="https://www.google.com/maps/d/embed?mid=11aXjBedi9Feevu1QM2TO8CvMqtV0-v0&ehbc=2E312F"></iframe>
         </div>
     </div>
 </div>
 
 <script>
-    // --- Embedded Geographic Data & Boundaries ---
     const districtZone = parseKmlCoords(`-122.4508025,45.384641,0 -122.4508275,45.38426,0 -122.4439795,45.382803,0 -122.4421035,45.383046,0 -122.4380005,45.384344,0 -122.4353175,45.386652,0 -122.4333385,45.389393,0 -122.4323995,45.389551,0 -122.4245375,45.388441,0 -122.4224965,45.388755,0 -122.4209595,45.388359,0 -122.4176955,45.386333,0 -122.4136975,45.381959,0 -122.4097405,45.378136,0 -122.4065635,45.377506,0 -122.4043735,45.377702,0 -122.3982145,45.373214,0 -122.3985895,45.371142,0 -122.3976155,45.368406,0 -122.3953655,45.366133,0 -122.3867695,45.361096,0 -122.3814285,45.355216,0 -122.3825155,45.353752,0 -122.3848535,45.351375,0 -122.3852265,45.349061,0 -122.3836655,45.346395,0 -122.3815205,45.344238,0 -122.3811285,45.342619,0 -122.3834965,45.340466,0 -122.3883365,45.339025,0 -122.3897135,45.337553,0 -122.3896665,45.33706,0 -122.3869755,45.335161,0 -122.3831095,45.333151,0 -122.3816435,45.330954,0 -122.3813415,45.32806,0 -122.3859505,45.326429,0 -122.3873355,45.323363,0 -122.4278075,45.323248,0 -122.4289845,45.320915,0 -122.4270385,45.319908,0 -122.4229265,45.31881,0 -122.4232855,45.315399,0 -122.4240025,45.314007,0 -122.4228805,45.312531,0 -122.4194855,45.312668,0 -122.4200885,45.311607,0 -122.4224915,45.311016,0 -122.4226365,45.309574,0 -122.4249485,45.308643,0 -122.4245825,45.308048,0 -122.4261005,45.306324,0 -122.4264355,45.30497,0 -122.4250555,45.304131,0 -122.4264285,45.301895,0 -122.4240025,45.299274,0 -122.4242805,45.298305,0 -122.4285525,45.297897,0 -122.4282575,45.295074,0 -122.4246825,45.295369,0 -122.4243075,45.291462,0 -122.4250555,45.289883,0 -122.4251615,45.288704,0 -122.4324435,45.28488,0 -122.4205255,45.284772,0 -122.4204345,45.276852,0 -122.4184905,45.275196,0 -122.4163895,45.274273,0 -122.4109595,45.274445,0 -122.4102905,45.273236,0 -122.3928295,45.274212,0 -122.3883835,45.274255,0 -122.3884575,45.271695,0 -122.3845375,45.271709,0 -122.3845565,45.274189,0 -122.3734435,45.274332,0 -122.3731805,45.254446,0 -122.3705815,45.252522,0 -122.3677655,45.252079,0 -122.3652105,45.249844,0 -122.3623185,45.246513,0 -122.3598775,45.245083,0 -122.3612045,45.243275,0 -122.3608155,45.241901,0 -122.3632725,45.240509,0 -122.3654385,45.238152,0 -122.3661795,45.236458,0 -122.3676665,45.235634,0 -122.3680025,45.233513,0 -122.3696655,45.23138,0 -122.3673385,45.227863,0 -122.3643325,45.228096,0 -122.3618685,45.226379,0 -122.3593735,45.225876,0 -122.3539415,45.226791,0 -122.3526215,45.225747,0 -122.3523165,45.223431,0 -122.3492185,45.221622,0 -122.3463965,45.218494,0 -122.3455245,45.215654,0 -122.3407405,45.215564,0 -122.3406235,45.212746,0 -122.3375795,45.212489,0 -122.3371415,45.205875,0 -122.3360425,45.205261,0 -122.3273755,45.204552,0 -122.3252395,45.204872,0 -122.3227445,45.203594,0 -122.3192205,45.20364,0 -122.3159625,45.202312,0 -122.3118785,45.202506,0 -122.3121475,45.171543,0 -122.2534465,45.171831,0 -122.2533915,45.16761,0 -122.2526775,45.075786,0 -122.2575035,44.88572,0 -121.8067275,44.88572,0 -121.7653435,44.885719,0 -121.7342445,44.88572,0 -121.7352745,44.888473,0 -121.7344175,44.88931,0 -121.7307585,44.890799,0 -121.7282295,44.891348,0 -121.7261595,44.893142,0 -121.7245405,44.895375,0 -121.7230345,44.896167,0 -121.7182415,44.89745,0 -121.7156135,44.900018,0 -121.7148755,44.90277,0 -121.7145815,44.90613,0 -121.7230265,44.906315,0 -121.7290155,44.904814,0 -121.7328425,44.906819,0 -121.7353935,44.907761,0 -121.7383185,44.910179,0 -121.7426355,44.912122,0 -121.7473185,44.914636,0 -121.7473455,44.917166,0 -121.7446065,44.91983,0 -121.7444745,44.920925,0 -121.7454575,44.923042,0 -121.7484735,44.927539,0 -121.7524385,44.93057,0 -121.7541455,44.932036,0 -121.7604005,44.938447,0 -121.7625815,44.941233,0 -121.7641045,44.941952,0 -121.7665485,44.941721,0 -121.7722575,44.93984,0 -121.7737965,44.938213,0 -121.7771775,44.936857,0 -121.7797915,44.935153,0 -121.7828715,44.935654,0 -121.7870495,44.935457,0 -121.7897245,44.934682,0 -121.7951315,44.935668,0 -121.7961485,44.937426,0 -121.7906825,44.941371,0 -121.7867565,44.945223,0 -121.7856335,44.947412,0 -121.7856145,44.950377,0 -121.7861685,44.952248,0 -121.7878085,45.95477,0 -121.7911335,45.956569,0 -121.7921835,45.95786,0 -121.7924965,44.959666,0 -121.7948045,44.964926,0 -121.7960515,44.970487,0 -121.7985235,44.973167,0 -121.7987055,44.974963,0 -121.8001525,44.976452,0 -121.8033665,44.977103,0 -121.8026475,44.981021,0 -121.8016445,44.982743,0 -121.8029565,44.987321,0 -121.8034925,44.992173,0 -121.8025685,44.995386,0 -121.8031845,44.999614,0 -121.8044275,45.002217,0 -121.8056885,45.006124,0 -121.8052905,45.011496,0 -121.8044475,45.012877,0 -121.8004615,45.015183,0 -121.7981755,45.01615,0 -121.7932405,45.017471,0 -121.7888265,45.016028,0 -121.7845775,45.015132,0 -121.7819795,45.015214,0 -121.7811195,45.016312,0 -121.7816095,45.018144,0 -121.7811425,45.021486,0 -121.7788245,45.026237,0 -121.7791535,45.030126,0 -121.7796935,45.031646,0 -121.7818515,45.033698,0 -121.7817485,45.034399,0 -121.7799275,45.035136,0 -121.7786935,45.037277,0 -121.7707595,45.039837,0 -121.7665165,45.03958,0 -121.7559365,45.037218,0 -121.7521735,45.036162,0 -121.7514755,45.034836,0 -121.7494645,45.034098,0 -121.7441245,45.03385,0 -121.7410155,45.034428,0 -121.7378125,45.033616,0 -121.7355665,45.034668,0 -121.7306465,45.036182,0 -121.7251965,45.036784,0 -121.7208355,45.036915,0 -121.7176735,45.037566,0 -121.7170175,45.038037,0 -121.7187025,45.039285,0 -121.7189985,45.042325,0 -121.7224285,45.044095,0 -121.7226055,45.045432,0 -121.7152875,45.051756,0 -121.7144835,45.053214,0 -121.7108345,45.055912,0 -121.7076605,45.057054,0 -121.6999605,45.05852,0 -121.6981645,45.059579,0 -121.6976775,45.061626,0 -121.6960565,45.062866,0 -121.6934175,45.06365,0 -121.6912355,45.065692,0 -121.6872555,45.067371,0 -121.6832985,45.068012,0 -121.6803675,45.068111,0 -121.6724265,45.067683,0 -121.6608735,45.066362,0 -121.6587315,45.066355,0 -121.6604515,45.069473,0 -121.6604405,45.073623,0 -121.6608495,45.075258,0 -121.6596605,45.079635,0 -121.6569305,45.082515,0 -121.6536145,45.084943,0 -121.6520395,45.086706,0 -121.6514155,45.088803,0 -121.6527535,45.097111,0 -121.6533365,45.098582,0 -121.6526025,45.099886,0 -121.6526595,45.101992,0 -121.6538875,45.102852,0 -121.6572665,45.103177,0 -121.6597935,45.103985,0 -121.6616775,45.105425,0 -121.6624365,45.107592,0 -121.6624035,45.11335,0 -121.6629025,45.114456,0 -121.6647155,45.115172,0 -121.6657385,45.11972,0 -121.6663995,45.120301,0 -121.6694875,45.121025,0 -121.6777435,45.12236,0 -121.6838515,45.123677,0 -121.6861425,45.123426,0 -121.6877975,45.122474,0 -121.6909015,45.11806,0 -121.6934085,45.116934,0 -121.6950955,45.117392,0 -121.6961065,45.118883,0 -121.6996965,45.12179,0 -121.6986715,45.123789,0 -121.7002295,45.127066,0 -121.7024045,45.129102,0 -121.7062005,45.131594,0 -121.7080715,45.134055,0 -121.7084235,45.137271,0 -121.7103125,45.14039,0 -121.7106715,45.143283,0 -121.7102225,45.148733,0 -121.7105245,45.150597,0 -121.7116175,45.152824,0 -121.7122405,45.153424,0 -121.7157375,45.154039,0 -121.7186965,45.156838,0 -121.7240205,45.158354,0 -121.7253045,45.159339,0 -121.7272155,45.161556,0 -121.7285545,45.164721,0 -121.7292475,45.168594,0 -121.7301895,45.170314,0 -121.7314595,45.170633,0 -121.7320395,45.170913,0 -121.7334245,45.174913,0 -121.7365275,45.176313,0 -121.7388155,45.180374,0 -121.7903045,45.180554,0 -121.7963985,45.180792,0 -121.8896145,45.180643,0 -121.8920995,45.179025,0 -121.8953745,45.16778,0 -121.9109775,45.180584,0 -122.0020975,45.180152,0 -122.0023505,45.203321,0 -122.0029875,45.260859,0 -122.0032755,45.288995,0 -122.0035695,45.322552,0 -122.0135025,45.322568,0 -122.0713445,45.322512,0 -122.0741175,45.322621,0 -122.0819865,45.322371,0 -122.1061515,45.322554,0 -122.1061215,45.344001,0 -122.1308425,45.343664,0 -122.1362835,45.343578,0 -122.1480675,45.343753,0 -122.1477965,45.317833,0 -122.1475385,45.315351,0 -122.1681285,45.315021,0 -122.1685135,45.286283,0 -122.2044025,45.285992,0 -122.2046165,45.289676,0 -122.2089955,45.289655,0 -122.2089155,45.293008,0 -122.2124825,45.293001,0 -122.2293405,45.293156,0 -122.2293455,45.294744,0 -122.2293625,45.296964,0 -122.2402435,45.297006,0 -122.2401815,45.294881,0 -122.2401205,45.292779,0 -122.2535515,45.292653,0 -122.2664175,45.292882,0 -122.2698565,45.29328,0 -122.2698635,45.305053,0 -122.2698105,45.324021,0 -122.2696645,45.33625,0 -122.2727765,45.336167,0 -122.2901355,45.336357,0 -122.2903085,45.350209,0 -122.2998425,45.350134,0 -122.3118225,45.350049,0 -122.3117985,45.353307,0 -122.3170235,45.353321,0 -122.3168645,45.357587,0 -122.3216965,45.357669,0 -122.3220545,45.364018,0 -122.3216435,45.371517,0 -122.3247795,45.371551,0 -122.3326255,45.371593,0 -122.3328375,45.374617,0 -122.3428235,45.375092,0 -122.3429675,45.377609,0 -122.3452765,45.378598,0 -122.3474985,45.378528,0 -122.3474775,45.382396,0 -122.3502975,45.382449,0 -122.3528095,45.382465,0 -122.3529215,45.389035,0 -122.3732635,45.389284,0 -122.3731025,45.396718,0 -122.3730865,45.397255,0 -122.3817885,45.396389,0 -122.3935465,45.396166,0 -122.3934755,45.394894,0 -122.3963525,45.394957,0 -122.3985485,45.394347,0 -122.4028425,45.394534,0 -122.4028505,45.396145,0 -122.4091985,45.3962,0 -122.4135465,45.396215,0 -122.4132245,45.402511,0 -122.4135655,45.403634,0 -122.4160615,45.403455,0 -122.4178675,45.399945,0 -122.4194115,45.398657,0 -122.4216885,45.397215,0 -122.4246625,45.398494,0 -122.4246805,45.400855,0 -122.4328285,45.400857,0 -122.4328225,45.394341,0 -122.4371215,45.396253,0 -122.4383385,45.395673,0 -122.4386605,45.397026,0 -122.4398235,45.396031,0 -122.4403235,45.391534,0 -122.4506565,45.389181,0 -122.4508025,45.384641,0`);
 
     const safetyZone = [
@@ -145,6 +184,9 @@
         { Name: 'EMS', Lat: 45.2891, Lon: -122.3305, Threshold: 1.50 },
         { Name: 'EHS', Lat: 45.2954, Lon: -122.3314, Threshold: 1.50 }
     ];
+
+    let currentAddress = "";
+    let currentCoords = { lat: 0, lon: 0 };
 
     function parseKmlCoords(coordStr) {
         let list = [];
@@ -203,11 +245,11 @@
             return;
         }
 
+        currentAddress = address;
         document.getElementById('loading').style.display = 'block';
         document.getElementById('results').style.display = 'none';
 
         try {
-            // 1. Geocode via Nominatim
             let geoRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(address)}`, {
                 headers: { 'User-Agent': 'EstacadaCalc/1.0' }
             });
@@ -220,6 +262,7 @@
 
             let lat = parseFloat(geoData[0].lat);
             let lon = parseFloat(geoData[0].lon);
+            currentCoords = { lat, lon };
 
             let inDistrict = testPointInPolygon(lat, lon, districtZone);
             let inSafetyZone = testPointInPolygon(lat, lon, safetyZone);
@@ -229,7 +272,6 @@
             if (inSafetyZone) metaHTML += `<br><span class="status-badge badge-yellow">>>> ELEMENTARY SAFETY ZONE DETECTED <<<</span>`;
             document.getElementById('metaInfo').innerHTML = metaHTML;
 
-            // 2. Fetch OSRM Walking Distances for Schools
             let tableBody = document.getElementById('schoolTableBody');
             tableBody.innerHTML = '';
             let distances = [];
@@ -258,10 +300,8 @@
                     }
                 }
 
-                // Check Route Assignment
                 let assignedRoute = "UNK RTE";
                 if (needsBus) {
-                    // Try loading Route 2 and Route 3 dynamically
                     assignedRoute = await findRouteForPoint(lat, lon);
                 } else {
                     assignedRoute = "WALK";
@@ -276,14 +316,12 @@
                 tableBody.innerHTML += row;
             }
 
-            // 3. Closest Bus Stops Calculation
             let uniqueRoutes = [...new Set(routeAssignments.map(r => r.Route).filter(r => r !== 'UNK RTE' && r !== 'WALK'))];
             let busStopContent = document.getElementById('busStopContent');
             busStopContent.innerHTML = '';
 
             if (uniqueRoutes.length > 0) {
                 for (let routeName of uniqueRoutes) {
-                    // Fetch routeData.json for the route (e.g., Route 2 -> Routes/Route2/routeData.json)
                     let folderName = routeName.replace(/\s+/g, '');
                     try {
                         let routeRes = await fetch(`Routes/${folderName}/routeData.json`);
@@ -334,7 +372,6 @@
                                 candidateStops.sort((a, b) => a.HaversineDist - b.HaversineDist);
                                 let topStops = candidateStops.slice(0, 3);
 
-                                // OSRM walk verification for top 3
                                 for (let ts of topStops) {
                                     try {
                                         let walkRes = await fetch(`https://router.project-osrm.org/route/v1/foot/${lon},${lat};${ts.Lon},${ts.Lat}?overview=false`);
@@ -386,7 +423,6 @@
     }
 
     async function findRouteForPoint(lat, lon) {
-        // Checks Route 2 and Route 3 (expand this array as you add Route 4 through 14)
         let routeNames = ["Route 2", "Route 3"];
         for (let rName of routeNames) {
             let folderName = rName.replace(/\s+/g, '');
@@ -398,14 +434,42 @@
                         return data.RouteName;
                     }
                 }
-            } catch (e) {
-                // skip missing route files
-            }
+            } catch (e) {}
         }
         return "UNK RTE";
     }
 
-    // Allow pressing Enter in input box
+    function downloadPinKml() {
+        if (!currentAddress) {
+            alert("Please calculate an address first.");
+            return;
+        }
+
+        let kmlContent = `<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>${currentAddress}</name>
+    <Placemark>
+      <name>${currentAddress}</name>
+      <description><![CDATA[Queried via Estacada Calculator]]></description>
+      <Point>
+        <coordinates>${currentCoords.lon},${currentCoords.lat},0</coordinates>
+      </Point>
+    </Placemark>
+  </Document>
+</kml>`;
+
+        let blob = new Blob([kmlContent], { type: 'application/vnd.google-earth.kml+xml' });
+        let url = URL.createObjectURL(blob);
+        let a = document.createElement('a');
+        a.href = url;
+        a.download = `${currentAddress.replace(/[^a-zA-Z0-9]/g, '_')}_pin.kml`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+
     document.getElementById('addressInput').addEventListener('keypress', function (e) {
         if (e.key === 'Enter') calculateAddress();
     });
